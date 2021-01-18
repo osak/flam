@@ -123,9 +123,7 @@ fn extract_timestamp(text: &str) -> Option<DateTime<Utc>> {
         }
     };
 
-    let ts_text = format!("{} 00", &text[start..end]);
-    info!("{}", ts_text);
-    let timestamp = NaiveDateTime::parse_from_str(&ts_text, "%b %d, %Y %H:%M %Z (%a) %S")
+    let timestamp = NaiveDateTime::parse_from_str(&text[start..end], "%b %d, %Y %H:%M %Z (%a)")
         .map(|t| Utc.from_utc_datetime(&t));
     match timestamp {
         Ok(t) => Some(t),
