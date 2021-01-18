@@ -1,5 +1,4 @@
-use chrono::Utc;
-use chrono::{DateTime, NaiveDateTime, TimeZone};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use ego_tree::NodeRef;
 use log::{info, warn};
 use scraper::element_ref::ElementRef;
