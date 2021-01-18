@@ -1,15 +1,14 @@
-use chrono::{NaiveDateTime, TimeZone};
-use chrono::{ParseError, Utc};
-use chrono::DateTime;
+use chrono::Utc;
+use chrono::{DateTime, NaiveDateTime, TimeZone};
 use ego_tree::NodeRef;
 use log::{info, warn};
-use selectors::attr::CaseSensitivity::CaseSensitive;
-use scraper::html::Html;
-use scraper::selector::Selector;
 use scraper::element_ref::ElementRef;
+use scraper::html::Html;
 use scraper::node::Node;
+use scraper::selector::Selector;
+use selectors::attr::CaseSensitivity::CaseSensitive;
 
-use crate::{entry::Entry, error::FlamError};
+use crate::entry::Entry;
 
 #[derive(Debug)]
 pub struct Lwn {
@@ -22,7 +21,8 @@ pub type LwnEntry = Entry<Lwn>;
 pub fn parse(raw: &str) -> Vec<LwnEntry> {
     let document = Html::parse_document(raw);
     let selector = Selector::parse(".BlurbListing").expect("failed to parse selector");
-    document.select(&selector)
+    document
+        .select(&selector)
         .map(to_entry)
         .filter(|e| e.is_some())
         .map(|e| e.unwrap())
@@ -37,23 +37,29 @@ fn to_entry(blurb: ElementRef) -> Option<LwnEntry> {
         Some(text) => text,
         _ => {
             info!("Headline is not found for current blurb. Skip processing it.");
-            return None
+            return None;
         }
     };
 
     let summary = match extract_summary(&blurb) {
         Some(text) => text,
         _ => {
-            info!("Summary is not found for blurb `{}`. Skip processing it.", title);
-            return None
+            info!(
+                "Summary is not found for blurb `{}`. Skip processing it.",
+                title
+            );
+            return None;
         }
     };
 
     let created = match extract_created(&blurb) {
         Some(ts) => ts,
         _ => {
-            info!("Timestamp cannot be parsed for blurb `{}`. Skip processing it.", title);
-            return None
+            info!(
+                "Timestamp cannot be parsed for blurb `{}`. Skip processing it.",
+                title
+            );
+            return None;
         }
     };
 
@@ -62,17 +68,14 @@ fn to_entry(blurb: ElementRef) -> Option<LwnEntry> {
         ref_id: "aaa".to_owned(),
         created: created,
         last_update: created,
-        data: Lwn {
-            title,
-            summary,
-        },
+        data: Lwn { title, summary },
     })
 }
 
 fn extract_headline(node: &NodeRef<Node>) -> Option<String> {
     let is_headline = match *node.value() {
         Node::Element(ref e) => e.has_class("Headline", CaseSensitive),
-        _ => false
+        _ => false,
     };
     if is_headline {
         let eref = ElementRef::wrap(*node).expect("node must be Element");
@@ -83,7 +86,8 @@ fn extract_headline(node: &NodeRef<Node>) -> Option<String> {
 }
 
 fn extract_summary(blurb: &ElementRef) -> Option<String> {
-    blurb.first_child()
+    blurb
+        .first_child()
         .map(|n| skip_until_tag(&n))
         .flatten()
         .map(|n| n.next_sibling())
@@ -94,7 +98,8 @@ fn extract_summary(blurb: &ElementRef) -> Option<String> {
 }
 
 fn extract_created(blurb: &ElementRef) -> Option<DateTime<Utc>> {
-    blurb.first_child()
+    blurb
+        .first_child()
         .map(|n| skip_until_tag(&n))
         .flatten()
         .map(|e| e.inner_html())
@@ -108,14 +113,14 @@ fn extract_timestamp(text: &str) -> Option<DateTime<Utc>> {
         Some(p) => p + "Posted ".len(),
         None => {
             warn!("Cannot find the beginning of timestamp in `{}`", text);
-            return None
+            return None;
         }
     };
     let end = match text.find(" by ") {
         Some(p) => p,
-        None => {
+        _ => {
             warn!("Cannot find the end of timestamp in `{}`", text);
-            return None
+            return None;
         }
     };
 
@@ -127,7 +132,7 @@ fn extract_timestamp(text: &str) -> Option<DateTime<Utc>> {
         Ok(t) => Some(t),
         Err(e) => {
             warn!("Failed to parse timestamp text `{}`. Reason: {}", text, e);
-            return None
+            return None;
         }
     }
 }

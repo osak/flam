@@ -1,10 +1,10 @@
 mod client;
-mod error;
 mod entry;
+mod error;
 mod parser;
 
-use reqwest::Url;
 use client::html::{Client, Config};
+use reqwest::Url;
 
 #[tokio::main]
 async fn main() {

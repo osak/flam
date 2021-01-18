@@ -1,5 +1,5 @@
-use chrono::Utc;
 use chrono::DateTime;
+use chrono::Utc;
 
 #[derive(Debug)]
 pub struct Entry<T> {
@@ -7,5 +7,5 @@ pub struct Entry<T> {
     pub(crate) ref_id: String,
     pub(crate) created: DateTime<Utc>,
     pub(crate) last_update: DateTime<Utc>,
-    pub(crate) data: T
+    pub(crate) data: T,
 }
