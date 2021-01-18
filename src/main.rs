@@ -1,13 +1,21 @@
 mod client;
 mod error;
+mod entry;
+mod parser;
 
 use reqwest::Url;
 use client::html::{Client, Config};
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let client = Client::new(&Config::default()).unwrap();
-    let url = Url::parse("https://osak.jp").unwrap();
+    let url = Url::parse("https://lwn.net").unwrap();
     let result = client.get(url).await.unwrap();
-    println!("{}", result);
+
+    let entries = parser::lwn::parse(&result);
+    for e in entries {
+        println!("{:?}", e);
+    }
 }
