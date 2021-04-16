@@ -1,8 +1,9 @@
+use std::fmt;
+
 use crate::client;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use log::info;
 use reqwest::Url;
-use std::error;
 use thiserror::Error;
 use xml::{
     common::Position,
@@ -26,6 +27,12 @@ pub struct Item {
     description: String,
 }
 
+#[derive(Debug, Error)]
+pub enum RssError {
+    #[error("Context mismatch at ({0}, {1}): current context is {2}, but encountered a close tag for {3}")]
+    ContextMismatch(u64, u64, Context, Context),
+}
+
 impl Default for Item {
     fn default() -> Item {
         Item {
@@ -34,6 +41,14 @@ impl Default for Item {
             created: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
             author: "".to_owned(),
             description: "".to_owned(),
+        }
+    }
+}
+
+impl From<RssError> for FlamError {
+    fn from(e: RssError) -> Self {
+        FlamError {
+            source: Box::new(e),
         }
     }
 }
@@ -48,13 +63,27 @@ impl From<xml::reader::Error> for FlamError {
 
 /// Current context of RSS document parsing
 #[derive(Debug, PartialEq, Eq)]
-enum Context {
+pub enum Context {
     Item,
     Title,
     Link,
     DcDate,
     DcCreator,
     Description,
+}
+
+impl fmt::Display for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let text = match self {
+            Context::Item => "Item",
+            Context::Title => "Title",
+            Context::Link => "Link",
+            Context::DcDate => "DcDate",
+            Context::DcCreator => "DcCreator",
+            Context::Description => "Description",
+        };
+        write!(f, "{}", text)
+    }
 }
 
 impl Client {
@@ -65,37 +94,48 @@ impl Client {
 
     pub async fn get(&self, uri: Url) -> Result<Vec<Item>, FlamError> {
         let body = self.client.get(uri).await?;
-        let reader = EventReader::from_str(&body);
+        let mut reader = EventReader::from_str(&body);
 
         let mut result: Vec<Item> = Vec::new();
         let mut current_item = Item::default();
-        let mut current_context: Option<Context> = None;
-        for e in reader {
-            match e {
+        let mut context_stack: Vec<Context> = Vec::new();
+        loop {
+            match reader.next() {
                 Ok(XmlEvent::StartElement { name, .. }) => {
-                    let context = self.resolve_context(&name);
+                    if let Some(context) = self.resolve_context(&name) {
+                        // Prepare a new item to fill in on reading an open <item> tag
+                        if context == Context::Item {
+                            current_item = Item::default();
+                        }
 
-                    // Prepare a new item to fill in on reading an open <item> tag
-                    if context == Some(Context::Item) {
-                        current_item = Item::default();
+                        // Update the current context
+                        context_stack.push(context);
                     }
-
-                    // Update current context
-                    current_context = context.or(current_context);
                 }
                 Ok(XmlEvent::EndElement { name, .. }) => {
-                    let context = self.resolve_context(&name);
+                    if let Some(context) = self.resolve_context(&name) {
+                        // Current context should be ended by this closing element.
+                        // If the closing tag is not matching with current context, RSS document is malformed.
+                        let current_context = context_stack
+                            .pop()
+                            .expect("Current context must not be empty");
+                        if current_context != context {
+                            let pos = reader.position();
+                            return Err(RssError::ContextMismatch(
+                                pos.row,
+                                pos.column,
+                                current_context,
+                                context,
+                            )
+                            .into());
+                        }
 
-                    match context {
-                        Some(Context::Item) => result.push(current_item.clone()),
-                        _ => (),
-                    }
-
-                    if context == current_context {
-                        current_context = None;
+                        if context == Context::Item {
+                            result.push(current_item.clone());
+                        }
                     }
                 }
-                Ok(XmlEvent::Characters(body)) => match &current_context {
+                Ok(XmlEvent::Characters(body)) => match context_stack.last() {
                     Some(Context::Title) => current_item.title += body.trim(),
                     Some(Context::Link) => current_item.link += body.trim(),
                     Some(Context::DcDate) => {
@@ -107,6 +147,7 @@ impl Client {
                     Some(Context::Description) => current_item.description += body.trim(),
                     _ => (),
                 },
+                Ok(XmlEvent::EndDocument) => break,
                 Err(err) => return Err(err.into()),
                 _ => (),
             }
