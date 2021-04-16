@@ -3,7 +3,7 @@ mod entry;
 mod error;
 mod parser;
 
-use client::html::{Client, Config};
+use client::{html::Client, http::Config};
 use reqwest::Url;
 
 #[tokio::main]
