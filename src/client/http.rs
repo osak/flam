@@ -51,9 +51,7 @@ impl Client {
         let client = reqwest::Client::builder()
             .user_agent(&config.user_agent)
             .build()?;
-        Ok(Client {
-            client,
-        })
+        Ok(Client { client })
     }
 
     pub async fn get(&self, uri: Url) -> Result<String, FlamError> {
