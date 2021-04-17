@@ -20,11 +20,11 @@ pub struct Client {
 
 #[derive(Debug, Clone)]
 pub struct Item {
-    title: String,
-    link: String,
-    created: DateTime<Utc>,
-    author: String,
-    description: String,
+    pub title: String,
+    pub link: String,
+    pub created: DateTime<Utc>,
+    pub author: String,
+    pub description: String,
 }
 
 #[derive(Debug, Error)]

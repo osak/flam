@@ -1,20 +1,15 @@
 mod client;
 mod entry;
 mod error;
+mod notifier;
 mod parser;
+mod runner;
 
-use client::{http::Config, rss::Client};
-use reqwest::Url;
+use crate::error::FlamError;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), FlamError> {
     env_logger::init();
 
-    let client = Client::new(&Config::default()).unwrap();
-    let url = Url::parse("https://lwn.net/headlines/rss").unwrap();
-    let result = client.get(url).await.unwrap();
-
-    for r in result {
-        println!("{:?}", r);
-    }
+    runner::lwn::run().await
 }
